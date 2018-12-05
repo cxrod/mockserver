@@ -131,7 +131,7 @@ function getWildcardPath(dir) {
             steps.splice(0, baseDir.length)
             return steps.join(path.sep)
         })
-    
+
     steps = removeBlanks(dir.split('/'))
 
     newPath = matchWildcardPaths(res, steps) || newPath;
@@ -180,32 +180,32 @@ function getDirectoriesRecursive(srcpath) {
 /**
  * Returns the body or query string to be used in
  * the mock name.
- * 
+ *
  * In any case we will prepend the value with a double
  * dash so that the mock files will look like:
- * 
+ *
  * POST--My-Body=123.mock
- * 
+ *
  * or
- * 
+ *
  * GET--query=string&hello=hella.mock
  */
 function getBodyOrQueryString(body, query) {
   if (query) {
     return '--' + query;
   }
-  
+
   if (body && body !== '') {
     return '--' + body;
   }
-  
+
   return body;
 }
 
 /**
  * Ghetto way to get the body
  * out of the request.
- * 
+ *
  * There are definitely better
  * ways to do this (ie. npm/body
  * or npm/body-parser) but for
@@ -216,12 +216,12 @@ function getBodyOrQueryString(body, query) {
  */
 function getBody(req, callback) {
   let body = '';
-  
+
   req.on('data', function(b){
     body = body + b.toString();
   });
 
-  req.on('end', function() {    
+  req.on('end', function() {
     callback(body);
   });
 }
@@ -257,13 +257,18 @@ function getContentFromPermutations(path, method, body, query, permutations) {
     return { content: content, prefix: prefix };
 }
 
+function isAssetsPath(path) {
+    return path.startsWith(mockserver.assets);
+}
+
 const mockserver = {
     directory:       '.',
     verbose:         false,
     headers:         [],
-    init:            function(directory, verbose) {
+    init:            function(directory, verbose, assets) {
         this.directory = directory;
         this.verbose   = !!verbose;
+        this.assets    = assets;
         this.headers   = prepareWatchedHeaders();
     },
     handle:          function(req, res) {
@@ -271,6 +276,23 @@ const mockserver = {
         req.body = body;
         const url = req.url;
         let path = url;
+
+        if (mockserver.assets && isAssetsPath(path)) {
+            try {
+                const asset = fs.readFileSync(join(mockserver.directory, path));
+                res.end(asset);
+                if (mockserver.verbose) {
+                    console.log('Reading from '+ path.yellow +' file: ' + 'Asset Found'.green);
+                }
+            } catch (e) {
+                res.writeHead(404);
+                res.end('Resource Not Found');
+                if (mockserver.verbose) {
+                    console.log('Reading from '+ path.yellow +' file: ' + 'Asset Not Found'.red);
+                }
+            }
+            return;
+        }
 
         const queryIndex = url.indexOf('?'),
             query = queryIndex >= 0 ? url.substring(queryIndex).replace(/\?/g, '') : '',
@@ -319,8 +341,8 @@ const mockserver = {
     }
 };
 
-module.exports = function(directory, silent) {
-    mockserver.init(directory, silent);
+module.exports = function(directory, silent, assets) {
+    mockserver.init(directory, silent, assets);
 
     return mockserver.handle;
 };
