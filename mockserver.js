@@ -4,6 +4,8 @@ const colors = require('colors');
 const join = path.join;
 const Combinatorics = require('js-combinatorics');
 const normalizeHeader = require('header-case-normalizer');
+const normalizeHeader = require('header-case-normalizer');
+const mime = require('mime-types')
 
 /**
  * Returns the status code out of the
@@ -275,20 +277,23 @@ const mockserver = {
       getBody(req, function(body) {
         req.body = body;
         const url = req.url;
+        const decodedPath = decodeURIComponent(url);
         let path = url;
 
-        if (mockserver.assets && isAssetsPath(path)) {
+        if (mockserver.assets && isAssetsPath(decodedPath)) {
             try {
-                const asset = fs.readFileSync(join(mockserver.directory, path));
+                const assetPath = join(mockserver.directory, decodedPath);
+                const asset = fs.readFileSync(assetPath);
+                res.setHeader('Content-Type', mime.contentType(assetPath));
                 res.end(asset);
                 if (mockserver.verbose) {
-                    console.log('Reading from '+ path.yellow +' file: ' + 'Asset Found'.green);
+                    console.log('Reading from '+ decodedPath.yellow +' file: ' + 'Asset Found'.green);
                 }
             } catch (e) {
                 res.writeHead(404);
                 res.end('Resource Not Found');
                 if (mockserver.verbose) {
-                    console.log('Reading from '+ path.yellow +' file: ' + 'Asset Not Found'.red);
+                    console.log('Reading from '+ decodedPath.yellow +' file: ' + 'Asset Not Found'.red);
                 }
             }
             return;
